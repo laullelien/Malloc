@@ -42,7 +42,7 @@ emalloc_small(unsigned long size)
     arena.chunkpool = ((node *)arena.chunkpool)->next;
     free(to_delete);
 
-    return mark_memarea_and_get_user_ptr(chunk_addr, size + 32, SMALL_KIND);
+    return mark_memarea_and_get_user_ptr(chunk_addr, CHUNKSIZE, SMALL_KIND);
 }
 
 void efree_small(Alloc a)

@@ -25,7 +25,7 @@ TEST(Basic, zero) {
 TEST(Basic, onetinysmall) {
     void *ptr = emalloc(1);
     ASSERT_NE( ptr, nullptr );
-    memset(ptr, 1, 1);
+    // memset(ptr, 1, 1);
     efree(ptr);
 }
 

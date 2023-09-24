@@ -9,39 +9,35 @@
 #include <stdint.h>
 #include "mem.h"
 #include "mem_internals.h"
+#define MAGIC_MASK 0xfffffffffffffffc
+#define MEMKIND_MASK 0x0000000000000003
 
-unsigned long knuth_mmix_one_round(uint64_t in)
-{
-    return in * (uint64_t)6364136223846793005 % (uint64_t)1442695040888963407;
+unsigned long knuth_mmix_one_round(unsigned long in) {
+    return in * 6364136223846793005UL % 1442695040888963407UL;
 }
 
-void *mark_memarea_and_get_user_ptr(void *ptr, unsigned long size, MemKind k)
-{
+void *mark_memarea_and_get_user_ptr(void *ptr, unsigned long size, MemKind k) {
     uint64_t taille = (uint64_t)size;
+    uint64_t magic =
+        (knuth_mmix_one_round((unsigned long)ptr) & MAGIC_MASK) + (uint64_t)k;
     *(uint64_t *)ptr = taille;
-    *(uint64_t *)(ptr + size - 8) = taille;
-    uint64_t magic = ((uint64_t)knuth_mmix_one_round((unsigned long)ptr) & (~(0b11UL))) + (uint64_t)k;
+    *(uint64_t *)(ptr + taille - 8) = taille;
     *(uint64_t *)(ptr + 8) = magic;
-    *(uint64_t *)(ptr + size - 16) = magic;
+    *(uint64_t *)(ptr + taille - 16) = magic;
     return ptr + 16;
 }
 
-Alloc mark_check_and_get_alloc(void *ptr)
-{
+Alloc mark_check_and_get_alloc(void *ptr) {
     Alloc a = {};
     a.ptr = ptr - 16;
-    a.size = *(uint64_t *)(a.ptr);
-    uint64_t magic = *(uint64_t *)(ptr - 8);
-    a.kind = (MemKind)(magic & 0x00000003);
-
-    uint64_t test = (uint64_t)knuth_mmix_one_round(((unsigned long)a.ptr) & (~(0b11UL)))+a.kind;
-    test++;
-    uint64_t test2 =  *(uint64_t *)(a.ptr + a.size - 8);
-    test2++;
-
-    assert(magic == (uint64_t)knuth_mmix_one_round(((unsigned long)a.ptr) & (~(0b11UL))) + (uint64_t)a.kind);
-    assert(a.size == *(uint64_t *)(a.ptr + a.size - 8));
-    assert(magic == *(uint64_t *)(a.ptr + a.size - 16));
+    uint64_t taille = *(uint64_t *)a.ptr;
+    uint64_t magic = *(uint64_t *)(a.ptr + 8);
+    a.kind = magic & MEMKIND_MASK;
+    a.size = taille;
+    assert(magic == (knuth_mmix_one_round((unsigned long)a.ptr) & MAGIC_MASK) +
+                        (uint64_t)a.kind);
+    assert(taille == *(uint64_t *)(a.ptr + taille - 8));
+    assert(magic == *(uint64_t *)(a.ptr + taille - 16));
     return a;
 }
 
