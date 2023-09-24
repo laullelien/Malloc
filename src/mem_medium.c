@@ -9,10 +9,12 @@
 #include <assert.h>
 #include <stdint.h>
 
-unsigned int puiss2(unsigned long size) {
+unsigned int puiss2(unsigned long size)
+{
     unsigned int p = 0;
     size = size - 1; // allocation start in 0
-    while (size) {   // get the largest bit
+    while (size)
+    { // get the largest bit
         p++;
         size >>= 1;
     }
@@ -21,26 +23,102 @@ unsigned int puiss2(unsigned long size) {
     return p;
 }
 
-void *emalloc_medium(unsigned long size) {
+void *emalloc_medium(unsigned long size)
+{
     assert(size < LARGEALLOC);
     assert(size > SMALLALLOC);
     // On doit stocker size + 32 (marquage) + un pointeur pour le
     // chainage
     unsigned int p = puiss2(size + 32 + sizeof(void *));
+    while (FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant <= p)
+    {
+        mem_realloc_medium();
+        *(void **)arena.TZL[FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant - 1] = (void *)NULL;
+    }
     for (int i = p;
-         i <= FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant; i++) {
-        if (arena.TZL[i]) {
-            void * ptr = arena.TZL[i];
-            arena.TZL[i] = (void *)*(arena.TZL[i]);
-            for (int j = i + 1; j >= p; j--) {
-
+         i < FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant; i++)
+    {
+        if (arena.TZL[i])
+        {
+            void *ptr = arena.TZL[i];
+            arena.TZL[i] = (void *)(*(void **)(arena.TZL[i]));
+            for (int j = i - 1; j >= p; j--)
+            {
+                void *cur_head = arena.TZL[j];
+                arena.TZL[j] = ptr;
+                *(void **)ptr = cur_head;
+                ptr += (1 << j);
             }
-            return (void *)0;
+            return mark_memarea_and_get_user_ptr(ptr + sizeof(void *), (1 << p) - sizeof(void *), MEDIUM_KIND);
         }
     }
-    // realoc
-    return (void *)0;
+    mem_realloc_medium();
+    void *ptr = arena.TZL[FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant - 1];
+    *(void **)ptr = (void *)NULL;
+    arena.TZL[FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant - 1] = (void *)NULL;
+    for (int j = FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant - 2; j >= p; j--)
+    {
+        void *cur_head = arena.TZL[j];
+        arena.TZL[j] = ptr;
+        *(void **)ptr = cur_head;
+        ptr += (1 << j);
+    }
+    return mark_memarea_and_get_user_ptr(ptr + sizeof(void *), (1 << p) - sizeof(void *), MEDIUM_KIND);
 }
 
-void efree_medium(Alloc a) { /* ecrire votre code ici */
+void fuse(void *ptr, unsigned int p)
+{
+    assert(p < 48);
+    if (p == 47)
+    {
+        void *cur_head = arena.TZL[p];
+        arena.TZL[p] = ptr;
+        *(void **)ptr = cur_head;
+    }
+    else
+    {
+        void *budd_ptr = (void *)((uint64_t)ptr ^ (1 << p));
+        void *cur_ptr = arena.TZL[p];
+        if (cur_ptr == NULL)
+        {
+            arena.TZL[p] = ptr;
+            *(void **)ptr = (void *)NULL;
+            return;
+        }
+        if (cur_ptr == budd_ptr)
+        {
+            arena.TZL[p] = *(void **)arena.TZL[p];
+            if (ptr < budd_ptr)
+                fuse(ptr, p + 1);
+            else
+                fuse(budd_ptr, p + 1);
+        }
+        while (*(void **)cur_ptr && *(void **)cur_ptr != budd_ptr)
+        {
+            cur_ptr = *(void **)cur_ptr;
+        }
+        if (*(void **)cur_ptr)
+        {
+            cur_ptr = **(void ***)cur_ptr;
+            if (ptr < budd_ptr)
+                fuse(ptr, p + 1);
+            else
+                fuse(budd_ptr, p + 1);
+        }
+        else
+        {
+            void *cur_head = arena.TZL[p];
+            arena.TZL[p] = ptr;
+            *(void **)ptr = cur_head;
+        }
+    }
+}
+
+void efree_medium(Alloc a)
+{
+    assert(a.kind == MEDIUM_KIND);
+    void *ptr = a.ptr - sizeof(void *);
+    unsigned long size = a.size + sizeof(void *);
+    unsigned int p = puiss2(size);
+    fuse(ptr, p);
 }
