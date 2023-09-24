@@ -10,20 +10,19 @@
 #include "mem.h"
 #include "mem_internals.h"
 
-unsigned long knuth_mmix_one_round(unsigned long in)
+unsigned long knuth_mmix_one_round(uint64_t in)
 {
-    return in * 6364136223846793005UL % 1442695040888963407UL;
+    return in * (uint64_t)6364136223846793005 % (uint64_t)1442695040888963407;
 }
 
 void *mark_memarea_and_get_user_ptr(void *ptr, unsigned long size, MemKind k)
 {
     uint64_t taille = (uint64_t)size;
     *(uint64_t *)ptr = taille;
-    *(uint64_t *)(ptr + 24 + size) = taille;
+    *(uint64_t *)(ptr + size - 8) = taille;
     uint64_t magic = ((uint64_t)knuth_mmix_one_round((unsigned long)ptr) & (~(0b11UL))) + (uint64_t)k;
     *(uint64_t *)(ptr + 8) = magic;
-    *(uint64_t *)(ptr + 16 + size) = magic;
-
+    *(uint64_t *)(ptr + size - 16) = magic;
     return ptr + 16;
 }
 
@@ -31,13 +30,18 @@ Alloc mark_check_and_get_alloc(void *ptr)
 {
     Alloc a = {};
     a.ptr = ptr - 16;
-    uint64_t taille = *(uint64_t *)(a.ptr);
-    a.size = taille;
+    a.size = *(uint64_t *)(a.ptr);
     uint64_t magic = *(uint64_t *)(ptr - 8);
     a.kind = (MemKind)(magic & 0x00000003);
+
+    uint64_t test = (uint64_t)knuth_mmix_one_round(((unsigned long)a.ptr) & (~(0b11UL)));
+    test++;
+    uint64_t test2 =  *(uint64_t *)(ptr + a.size - 8);
+    test2++;
+
     assert(magic == (uint64_t)knuth_mmix_one_round(((unsigned long)a.ptr) & (~(0b11UL))) + (uint64_t)a.kind);
-    assert(taille == *(uint64_t *)(ptr + 8 + a.size));
-    assert(magic == *(uint64_t *)(ptr + a.size));
+    assert(a.size == *(uint64_t *)(ptr + a.size - 8));
+    assert(magic == *(uint64_t *)(ptr + a.size - 16));
     return a;
 }
 
