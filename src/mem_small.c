@@ -29,11 +29,12 @@ emalloc_small(unsigned long size)
         while (size >= CHUNKSIZE)
         {
             current_node->next = malloc(sizeof(node));
+            current_node = current_node->next;
             current_node->ptr = current_addr;
             current_addr += CHUNKSIZE;
             size -= CHUNKSIZE;
-            current_node = current_node->next;
         }
+        current_node->next = NULL;
     }
 
     void *chunk_addr = ((node *)arena.chunkpool)->ptr;
