@@ -34,7 +34,7 @@ Alloc mark_check_and_get_alloc(void *ptr)
     uint64_t magic = *(uint64_t *)(ptr - 8);
     a.kind = (MemKind)(magic & 0x00000003);
 
-    uint64_t test = (uint64_t)knuth_mmix_one_round(((unsigned long)a.ptr) & (~(0b11UL)));
+    uint64_t test = (uint64_t)knuth_mmix_one_round(((unsigned long)a.ptr) & (~(0b11UL)))+a.kind;
     test++;
     uint64_t test2 =  *(uint64_t *)(a.ptr + a.size - 8);
     test2++;

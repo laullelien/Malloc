@@ -33,7 +33,7 @@ emalloc_medium(unsigned long size)
     {
         if (arena.TZL[i])
         {
-
+            
             return (void *)0;
         }
     }
