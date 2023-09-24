@@ -36,12 +36,12 @@ Alloc mark_check_and_get_alloc(void *ptr)
 
     uint64_t test = (uint64_t)knuth_mmix_one_round(((unsigned long)a.ptr) & (~(0b11UL)));
     test++;
-    uint64_t test2 =  *(uint64_t *)(ptr + a.size - 8);
+    uint64_t test2 =  *(uint64_t *)(a.ptr + a.size - 8);
     test2++;
 
     assert(magic == (uint64_t)knuth_mmix_one_round(((unsigned long)a.ptr) & (~(0b11UL))) + (uint64_t)a.kind);
-    assert(a.size == *(uint64_t *)(ptr + a.size - 8));
-    assert(magic == *(uint64_t *)(ptr + a.size - 16));
+    assert(a.size == *(uint64_t *)(a.ptr + a.size - 8));
+    assert(magic == *(uint64_t *)(a.ptr + a.size - 16));
     return a;
 }
 
