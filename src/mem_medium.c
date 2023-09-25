@@ -74,43 +74,42 @@ void fuse(void *ptr, unsigned int p)
         void *cur_head = arena.TZL[p];
         arena.TZL[p] = ptr;
         *(void **)ptr = cur_head;
+        return;
+    }
+    void *budd_ptr = (void *)((uint64_t)ptr ^ (1 << p));
+    void *cur_ptr = arena.TZL[p];
+    if (cur_ptr == NULL)
+    {
+        arena.TZL[p] = ptr;
+        *(void **)ptr = (void *)NULL;
+        return;
+    }
+    if (cur_ptr == budd_ptr)
+    {
+        arena.TZL[p] = *(void **)arena.TZL[p];
+        if (ptr < budd_ptr)
+            fuse(ptr, p + 1);
+        else
+            fuse(budd_ptr, p + 1);
+        return;
+    }
+    while (*(void **)cur_ptr && *(void **)cur_ptr != budd_ptr)
+    {
+        cur_ptr = *(void **)cur_ptr;
+    }
+    if (*(void **)cur_ptr)
+    {
+        *(void **)cur_ptr = *(void **)budd_ptr;
+        if (ptr < budd_ptr)
+            fuse(ptr, p + 1);
+        else
+            fuse(budd_ptr, p + 1);
     }
     else
     {
-        void *budd_ptr = (void *)((uint64_t)ptr ^ (1 << p));
-        void *cur_ptr = arena.TZL[p];
-        if (cur_ptr == NULL)
-        {
-            arena.TZL[p] = ptr;
-            *(void **)ptr = (void *)NULL;
-            return;
-        }
-        if (cur_ptr == budd_ptr)
-        {
-            arena.TZL[p] = *(void **)arena.TZL[p];
-            if (ptr < budd_ptr)
-                fuse(ptr, p + 1);
-            else
-                fuse(budd_ptr, p + 1);
-        }
-        while (*(void **)cur_ptr && *(void **)cur_ptr != budd_ptr)
-        {
-            cur_ptr = *(void **)cur_ptr;
-        }
-        if (*(void **)cur_ptr)
-        {
-            cur_ptr = **(void ***)cur_ptr;
-            if (ptr < budd_ptr)
-                fuse(ptr, p + 1);
-            else
-                fuse(budd_ptr, p + 1);
-        }
-        else
-        {
-            void *cur_head = arena.TZL[p];
-            arena.TZL[p] = ptr;
-            *(void **)ptr = cur_head;
-        }
+        void *cur_head = arena.TZL[p];
+        arena.TZL[p] = ptr;
+        *(void **)ptr = cur_head;
     }
 }
 
@@ -120,5 +119,6 @@ void efree_medium(Alloc a)
     void *ptr = a.ptr - sizeof(void *);
     unsigned long size = a.size + sizeof(void *);
     unsigned int p = puiss2(size);
+    assert(size == (1 << p));
     fuse(ptr, p);
 }
