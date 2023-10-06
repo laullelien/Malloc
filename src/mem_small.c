@@ -7,6 +7,7 @@
 #include <assert.h>
 #include "mem.h"
 #include "mem_internals.h"
+#include <stdint.h>
 
 void *
 emalloc_small(unsigned long size)
@@ -15,37 +16,29 @@ emalloc_small(unsigned long size)
     {
         // On realloc de la mémoire
         unsigned long size = mem_realloc_small();
-        void *current_addr = arena.chunkpool;
-        while (size >=)
-            arena.chunkpool = malloc(sizeof(node));
-        node *current_node = arena.chunkpool;
-        current_node->ptr = current_addr;
-        current_addr += CHUNKSIZE;
-        size -= CHUNKSIZE;
-        while (size >= CHUNKSIZE)
+        // On doit stocker un pointeur en plus
+        static const uint8_t TOTAL_CHUNKSIZE = CHUNKSIZE + sizeof(void *);
+        void *ptr = arena.chunkpool;
+        while (size >= TOTAL_CHUNKSIZE)
         {
-            current_node->next = malloc(sizeof(node));
-            current_node = current_node->next;
-            current_node->ptr = current_addr;
-            current_addr += CHUNKSIZE;
-            size -= CHUNKSIZE;
+            *(void **)ptr = ptr + TOTAL_CHUNKSIZE;
+            ptr = *(void **)ptr;
+            size -= TOTAL_CHUNKSIZE;
         }
-        current_node->next = NULL;
+
+        // On met le dernier à null
+        *(void **)ptr = (void *)NULL;
     }
 
-    void *chunk_addr = ((node *)arena.chunkpool)->ptr;
-    node *to_delete = arena.chunkpool;
-    arena.chunkpool = ((node *)arena.chunkpool)->next;
-    free(to_delete);
-
+    void *chunk_addr = arena.chunkpool + sizeof(void *);
+    arena.chunkpool = *(void **)arena.chunkpool;
     return mark_memarea_and_get_user_ptr(chunk_addr, CHUNKSIZE, SMALL_KIND);
 }
 
 void efree_small(Alloc a)
 {
     assert(a.kind == SMALL_KIND);
-    node *new_node = malloc(sizeof(node));
-    new_node->ptr = a.ptr;
-    new_node->next = arena.chunkpool;
-    arena.chunkpool = new_node;
+    void *prev = arena.chunkpool;
+    arena.chunkpool = a.ptr - sizeof(void *);
+    *(void **)arena.chunkpool = prev;
 }
