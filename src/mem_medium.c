@@ -30,16 +30,19 @@ void *emalloc_medium(unsigned long size)
     // On doit stocker size + 32 (marquage) + un pointeur pour le
     // chainage
     unsigned int p = puiss2(size + 32 + sizeof(void *));
+    // On regarde s'il y a une possibilitée d'obtenir la taille nécessaire
     while (FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant <= p)
     {
         mem_realloc_medium();
         *(void **)arena.TZL[FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant - 1] = (void *)NULL;
     }
+    // On regarde s'il existe un bloc de taille assez grande
     for (int i = p;
          i < FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant; i++)
     {
         if (arena.TZL[i])
         {
+            // On divise le bloc
             void *ptr = arena.TZL[i];
             arena.TZL[i] = (void *)(*(void **)(arena.TZL[i]));
             for (int j = i - 1; j >= p; j--)
@@ -52,7 +55,9 @@ void *emalloc_medium(unsigned long size)
             return mark_memarea_and_get_user_ptr(ptr + sizeof(void *), (1 << p) - sizeof(void *), MEDIUM_KIND);
         }
     }
+    // Aucun bloc n'a été trouvé
     mem_realloc_medium();
+    // On applique le même algorithme que plus haut
     void *ptr = arena.TZL[FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant - 1];
     *(void **)ptr = (void *)NULL;
     arena.TZL[FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant - 1] = (void *)NULL;

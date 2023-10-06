@@ -8,20 +8,16 @@
 #include "mem.h"
 #include "mem_internals.h"
 
-typedef struct _node
-{
-    void *ptr;
-    struct _node *next;
-} node;
-
 void *
 emalloc_small(unsigned long size)
 {
     if (arena.chunkpool == NULL)
     {
+        // On realloc de la mémoire
         unsigned long size = mem_realloc_small();
         void *current_addr = arena.chunkpool;
-        arena.chunkpool = malloc(sizeof(node));
+        while (size >=)
+            arena.chunkpool = malloc(sizeof(node));
         node *current_node = arena.chunkpool;
         current_node->ptr = current_addr;
         current_addr += CHUNKSIZE;
