@@ -9,28 +9,27 @@
 #include "mem_internals.h"
 #include <stdint.h>
 
-void *
-emalloc_small(unsigned long size)
+void * emalloc_small(unsigned long size)
 {
     if (arena.chunkpool == NULL)
     {
         // On realloc de la mémoire
         unsigned long size = mem_realloc_small();
         // On doit stocker un pointeur en plus
-        static const uint8_t TOTAL_CHUNKSIZE = CHUNKSIZE + sizeof(void *);
         void *ptr = arena.chunkpool;
-        while (size >= TOTAL_CHUNKSIZE)
+        size -= CHUNKSIZE;
+        while (size >= CHUNKSIZE)
         {
-            *(void **)ptr = ptr + TOTAL_CHUNKSIZE;
+            *(void **)ptr = ptr + CHUNKSIZE;
             ptr = *(void **)ptr;
-            size -= TOTAL_CHUNKSIZE;
+            size -= CHUNKSIZE;
         }
 
         // On met le dernier à null
         *(void **)ptr = (void *)NULL;
     }
 
-    void *chunk_addr = arena.chunkpool + sizeof(void *);
+    void *chunk_addr = arena.chunkpool;
     arena.chunkpool = *(void **)arena.chunkpool;
     return mark_memarea_and_get_user_ptr(chunk_addr, CHUNKSIZE, SMALL_KIND);
 }
@@ -39,6 +38,6 @@ void efree_small(Alloc a)
 {
     assert(a.kind == SMALL_KIND);
     void *prev = arena.chunkpool;
-    arena.chunkpool = a.ptr - sizeof(void *);
+    arena.chunkpool = a.ptr;
     *(void **)arena.chunkpool = prev;
 }

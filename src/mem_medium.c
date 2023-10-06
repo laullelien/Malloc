@@ -27,13 +27,13 @@ void *emalloc_medium(unsigned long size)
 {
     assert(size < LARGEALLOC);
     assert(size > SMALLALLOC);
-    // On doit stocker size + 32 (marquage) + un pointeur pour le
-    // chainage
-    unsigned int p = puiss2(size + 32 + sizeof(void *));
+    // On doit stocker size + 32 (marquage)
+    unsigned int p = puiss2(size + 32);
     // On regarde s'il y a une possibilitée d'obtenir la taille nécessaire
     while (FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant <= p)
     {
         mem_realloc_medium();
+        // On met le pointeur vers le suivant à null
         *(void **)arena.TZL[FIRST_ALLOC_MEDIUM_EXPOSANT + arena.medium_next_exponant - 1] = (void *)NULL;
     }
     // On regarde s'il existe un bloc de taille assez grande
@@ -52,7 +52,7 @@ void *emalloc_medium(unsigned long size)
                 *(void **)ptr = cur_head;
                 ptr += (1 << j);
             }
-            return mark_memarea_and_get_user_ptr(ptr + sizeof(void *), (1 << p) - sizeof(void *), MEDIUM_KIND);
+            return mark_memarea_and_get_user_ptr(ptr, (1 << p), MEDIUM_KIND);
         }
     }
     // Aucun bloc n'a été trouvé
@@ -68,12 +68,12 @@ void *emalloc_medium(unsigned long size)
         *(void **)ptr = cur_head;
         ptr += (1 << j);
     }
-    return mark_memarea_and_get_user_ptr(ptr + sizeof(void *), (1 << p) - sizeof(void *), MEDIUM_KIND);
+    return mark_memarea_and_get_user_ptr(ptr, (1 << p), MEDIUM_KIND);
 }
 
 void fuse(void *ptr, unsigned int p)
 {
-    assert(p < 48);
+    // taille maximale
     if (p == 47)
     {
         void *cur_head = arena.TZL[p];
@@ -81,7 +81,7 @@ void fuse(void *ptr, unsigned int p)
         *(void **)ptr = cur_head;
         return;
     }
-    void *budd_ptr = (void *)((uint64_t)ptr ^ (1 << p));
+    void *budd_ptr = (void *)((uintptr_t)ptr ^ (1 << p));
     void *cur_ptr = arena.TZL[p];
     if (cur_ptr == NULL)
     {
@@ -118,12 +118,58 @@ void fuse(void *ptr, unsigned int p)
     }
 }
 
+void *min(void *p, void *q)
+{
+    if ((uintptr_t)p < (uintptr_t)q)
+    {
+        return p;
+    }
+    return q;
+}
+
 void efree_medium(Alloc a)
 {
     assert(a.kind == MEDIUM_KIND);
-    void *ptr = a.ptr - sizeof(void *);
-    unsigned long size = a.size + sizeof(void *);
-    unsigned int p = puiss2(size);
-    assert(size == (1 << p));
-    fuse(ptr, p);
+    unsigned int p = puiss2(a.size);
+    assert(a.size == (1 << p));
+    void *ptr = a.ptr;
+    while (p < 47)
+    {
+        void *budd_ptr = (void *)((uintptr_t)ptr ^ (1 << p));
+        void *cur_ptr = arena.TZL[p];
+        // On parcourt  la lite. Si on trouve le buddy, on recommence dans la TLZ d'au dessus. Sinon, on insert
+        if (cur_ptr == NULL)
+        {
+            arena.TZL[p] = ptr;
+            *(void **)ptr = (void *)NULL;
+            return;
+        }
+        if (cur_ptr == budd_ptr)
+        {
+            arena.TZL[p] = *(void **)arena.TZL[p];
+            ptr = min(ptr, budd_ptr);
+            p++;
+            continue;
+        }
+        while (*(void **)cur_ptr && *(void **)cur_ptr != budd_ptr)
+        {
+            cur_ptr = *(void **)cur_ptr;
+        }
+        if (*(void **)cur_ptr)
+        {
+            *(void **)cur_ptr = *(void **)budd_ptr;
+            ptr = min(ptr, budd_ptr);
+            p++;
+        }
+        else
+        {
+            void *cur_head = arena.TZL[p];
+            arena.TZL[p] = ptr;
+            *(void **)ptr = cur_head;
+            return;
+        }
+    }
+    void *cur_head = arena.TZL[p];
+    arena.TZL[p] = ptr;
+    *(void **)ptr = cur_head;
 }
